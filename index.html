@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0E0F11" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Forja" />
+<title>Forja · Entrenamiento</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  :root{
+    --bg:#0E0F11;
+    --panel:#17181C;
+    --panel-2:#1F2128;
+    --line:#2A2D35;
+    --text:#F2F3F5;
+    --muted:#8A8F9A;
+    --accent:#C6FF3D;      /* lima atlético */
+    --accent-dim:#9ECC2F;
+    --gold:#FFC94D;        /* récords / PR */
+    --red:#FF6B5E;
+    --radius:18px;
+    --tap:56px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:'Manrope',-apple-system,system-ui,sans-serif;
+    overscroll-behavior-y:none;}
+  body{min-height:100vh;}
+  #root{max-width:520px;margin:0 auto;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  .num{font-family:'Archivo',sans-serif;font-variant-numeric:tabular-nums;}
+  .display{font-family:'Archivo',sans-serif;letter-spacing:-0.02em;}
+  .screen{padding:18px 16px 110px;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .muted{color:var(--muted);}
+  .accent{color:var(--accent);}
+
+  /* Header */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 2px 18px;}
+  .topbar h1{font-family:'Archivo';font-weight:900;font-size:26px;margin:0;letter-spacing:-0.03em;}
+  .streak{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);
+    padding:8px 12px;border-radius:999px;font-weight:700;font-size:14px;}
+
+  /* Cards / grid */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;}
+  .stat .v{font-family:'Archivo';font-weight:800;font-size:30px;line-height:1;letter-spacing:-0.02em;}
+  .stat .l{color:var(--muted);font-size:12px;font-weight:600;margin-top:6px;text-transform:uppercase;letter-spacing:.04em;}
+  .stat.hl{background:linear-gradient(150deg,#1c2410,#17181C);border-color:#3a4a18;}
+  .stat.hl .v{color:var(--accent);}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-top:12px;}
+  .card h3{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;}
+
+  /* Big primary button */
+  .cta{width:100%;background:var(--accent);color:#10130a;font-family:'Archivo';font-weight:900;
+    font-size:19px;letter-spacing:.02em;border-radius:16px;padding:18px;margin-top:16px;
+    box-shadow:0 8px 24px -8px rgba(198,255,61,.5);transition:transform .08s;}
+  .cta:active{transform:scale(.98);}
+  .cta.ghost{background:var(--panel-2);color:var(--text);box-shadow:none;border:1px solid var(--line);}
+
+  /* Day picker */
+  .day{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--panel);
+    border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:10px;transition:border-color .15s;}
+  .day:active{border-color:var(--accent);}
+  .day .badge{width:46px;height:46px;border-radius:12px;background:var(--panel-2);display:flex;
+    align-items:center;justify-content:center;font-family:'Archivo';font-weight:900;font-size:22px;color:var(--accent);flex:0 0 auto;}
+  .day .t{font-weight:700;font-size:16px;}
+  .day .s{color:var(--muted);font-size:13px;margin-top:2px;}
+
+  /* Active workout */
+  .exh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .exh .name{font-weight:800;font-size:17px;line-height:1.15;}
+  .meta{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;}
+  .chip{font-size:11.5px;font-weight:700;padding:5px 9px;border-radius:8px;background:var(--panel-2);color:var(--muted);}
+  .chip.rec{color:var(--gold);background:#2a230f;}
+  .chip.star{color:var(--accent);background:#222e10;}
+  .chip.sug{color:var(--accent);background:#222e10;}
+
+  .setrow{display:flex;align-items:center;gap:8px;margin-top:10px;}
+  .setrow .n{width:26px;text-align:center;font-family:'Archivo';font-weight:800;color:var(--muted);flex:0 0 auto;}
+  .stepper{display:flex;align-items:center;background:var(--panel-2);border-radius:12px;overflow:hidden;flex:1;}
+  .stepper button{width:42px;height:48px;font-family:'Archivo';font-size:24px;font-weight:700;color:var(--accent);flex:0 0 auto;}
+  .stepper button:active{background:#2c3320;}
+  .stepper .val{flex:1;text-align:center;}
+  .stepper .val .big{font-family:'Archivo';font-weight:800;font-size:19px;}
+  .stepper .val .u{font-size:10px;color:var(--muted);display:block;margin-top:-2px;font-weight:600;}
+  .check{width:54px;height:50px;border-radius:13px;background:var(--panel-2);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font-size:22px;flex:0 0 auto;transition:all .12s;}
+  .check.done{background:var(--accent);color:#10130a;border-color:var(--accent);}
+  .setrow.done .stepper{opacity:.55;}
+
+  .feelrow{display:flex;gap:6px;margin:6px 0 0 34px;}
+  .feelchip{font-size:11px;font-weight:700;padding:6px 10px;border-radius:8px;background:var(--panel-2);color:var(--muted);border:1px solid transparent;}
+  .feelchip.on.easy{background:#16331a;color:#7CE38B;border-color:#2e6b38;}
+  .feelchip.on.ok{background:#33310f;color:var(--gold);border-color:#6b6320;}
+  .feelchip.on.fail{background:#331616;color:var(--red);border-color:#6b2e2e;}
+
+  .addset{margin-top:10px;color:var(--accent);font-weight:700;font-size:13px;}
+  .rmex{color:var(--muted);font-size:12px;font-weight:700;}
+
+  /* Rest timer bar */
+  .rest{position:fixed;left:0;right:0;bottom:64px;max-width:520px;margin:0 auto;padding:0 16px;z-index:40;
+    animation:slideup .25s ease;}
+  @keyframes slideup{from{transform:translateY(20px);opacity:0;}to{transform:none;opacity:1;}}
+  .rest-inner{background:var(--panel-2);border:1px solid var(--accent);border-radius:14px;padding:10px 12px;
+    display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px -10px rgba(0,0,0,.7);}
+  .rest .time{font-family:'Archivo';font-weight:900;font-size:24px;color:var(--accent);min-width:64px;}
+  .rest small{display:block;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;}
+  .rest .adj{width:40px;height:40px;border-radius:10px;background:var(--panel);font-weight:800;color:var(--text);}
+  .rest .skip{margin-left:auto;color:var(--muted);font-weight:700;font-size:13px;padding:8px;}
+
+  /* Finish bar */
+  .finishbar{position:fixed;left:0;right:0;bottom:0;max-width:520px;margin:0 auto;padding:10px 16px 22px;
+    background:linear-gradient(transparent,var(--bg) 30%);z-index:30;}
+
+  /* Tab bar */
+  .tabs{position:fixed;left:0;right:0;bottom:0;max-width:520px;margin:0 auto;height:64px;background:#101115;
+    border-top:1px solid var(--line);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom);}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);font-size:11px;font-weight:700;}
+  .tab.on{color:var(--accent);}
+  .tab .ic{font-size:20px;line-height:1;}
+
+  /* Feel / summary */
+  .bigfeel{display:flex;gap:10px;margin-top:12px;}
+  .bigfeel button{flex:1;background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:18px 8px;
+    display:flex;flex-direction:column;align-items:center;gap:8px;font-weight:800;font-size:13px;transition:all .12s;}
+  .bigfeel button .e{font-size:30px;}
+  .bigfeel button.sel{border-color:var(--accent);background:#1b2210;}
+  .seg{display:flex;gap:8px;margin-top:10px;}
+  .seg button{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 6px;font-weight:700;font-size:14px;}
+  .seg button.sel{border-color:var(--accent);color:var(--accent);background:#1b2210;}
+
+  .sumv{font-family:'Archivo';font-weight:900;font-size:46px;letter-spacing:-0.03em;line-height:1;}
+  .prline{display:flex;align-items:center;gap:8px;background:#2a230f;border:1px solid #5a4a18;border-radius:12px;padding:10px 12px;margin-top:8px;color:var(--gold);font-weight:700;font-size:14px;}
+
+  /* History */
+  .hrow{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;}
+  .hrow .dot{font-family:'Archivo';font-weight:900;font-size:18px;color:var(--accent);}
+  .empty{text-align:center;color:var(--muted);padding:48px 20px;}
+  .empty .em{font-size:40px;margin-bottom:10px;}
+
+  .back{color:var(--muted);font-weight:700;font-size:14px;margin-bottom:6px;display:inline-flex;gap:6px;align-items:center;}
+  .detline{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;}
+  .detline:last-child{border:none;}
+
+  /* Bottom sheet (agregar ejercicio) */
+  .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:60;display:flex;align-items:flex-end;justify-content:center;animation:fade .2s;}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:22px 22px 0 0;width:100%;max-width:520px;max-height:80vh;overflow-y:auto;padding:18px 16px 30px;animation:slideup .25s ease;}
+  .sheet h2{font-family:'Archivo';font-weight:900;font-size:21px;margin:0 0 2px;letter-spacing:-0.02em;}
+  .sheet .gh{color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;margin:16px 0 4px;}
+  .pick{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;padding:14px 13px;border-radius:12px;background:var(--panel-2);margin-top:8px;}
+  .pick:active{background:#2a2d35;}
+  .pick .pn{font-weight:700;font-size:15px;}
+  .pick .pl{color:var(--accent);font-family:'Archivo';font-weight:900;font-size:22px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef} = React;
+
+/* ---------- Almacenamiento (funciona en Claude y en GitHub Pages) ---------- */
+const KEY = "forja_v1";
+async function loadState(){
+  try{
+    if(window.storage){ const r = await window.storage.get(KEY); return r ? JSON.parse(r.value) : null; }
+    const s = window.localStorage.getItem(KEY); return s ? JSON.parse(s) : null;
+  }catch(e){ return null; }
+}
+async function saveState(state){
+  const v = JSON.stringify(state);
+  try{
+    if(window.storage){ await window.storage.set(KEY, v); return; }
+    window.localStorage.setItem(KEY, v);
+  }catch(e){ console.error("save", e); }
+}
+
+/* ---------- Datos semilla: tu rutina, ejercicios y pesos ---------- */
+const S = false, P = true; // perSide
+function ex(id,name,group,perSide,lastWeight,lastReps,record,star){
+  return {id,name,group,perSide,lastWeight,lastReps,record:record||lastWeight,lastFeel:null,lastDate:null,star:!!star};
+}
+const SEED_EX = {
+  inclinado_smith: ex("inclinado_smith","Press inclinado en Smith","Pecho",P,22.5,10,30),
+  plano_manc:      ex("plano_manc","Banco plano con mancuernas","Pecho",P,17,10,20),
+  aperturas:       ex("aperturas","Aperturas en máquina","Pecho",S,47.5,10,50),
+  laterales_polea: ex("laterales_polea","Vuelos laterales en polea","Hombro",S,12.5,10,20,true),
+  press_militar:   ex("press_militar","Press militar con mancuerna","Hombro",P,10,10,12),
+  tricep_triangulo:ex("tricep_triangulo","Tríceps en polea (triángulo)","Tríceps",S,47.5,10,65),
+  empuje_barra:    ex("empuje_barra","Empuje con barra (tríceps)","Tríceps",S,50,10,50),
+
+  plano_barra:     ex("plano_barra","Press plano con barra","Pecho",S,50,10,50),
+  inclinado_manc:  ex("inclinado_manc","Press inclinado con mancuernas","Pecho",P,17,10,20),
+  cruces_polea:    ex("cruces_polea","Cruces en polea (crossover)","Pecho",S,15,12,15),
+  posteriores:     ex("posteriores","Posteriores con soga (face pull)","Hombro",S,50,12,50),
+  fondos_maq:      ex("fondos_maq","Fondos en máquina","Tríceps",S,40,10,40),
+  tricep_soga:     ex("tricep_soga","Tríceps en polea (soga)","Tríceps",S,30,12,30),
+
+  polea_abierta:   ex("polea_abierta","Jalón al pecho agarre abierto","Espalda",S,55,10,70,true),
+  dominadas:       ex("dominadas","Dominadas / jalón neutro","Espalda",S,0,10,0,true),
+  remo_barra:      ex("remo_barra","Remo con barra (supinación)","Espalda",S,60,10,75),
+  pullover:        ex("pullover","Pullover / jalón brazos rectos","Espalda",S,25,12,25,true),
+  curl_barra_w:    ex("curl_barra_w","Curl con barra W","Bíceps",S,40,10,50),
+  martillo:        ex("martillo","Curl martillo con mancuernas","Bíceps",P,12,10,12),
+
+  polea_neutro:    ex("polea_neutro","Jalón agarre neutro","Espalda",S,50,10,50),
+  remo_polea_baja: ex("remo_polea_baja","Remo en polea baja","Espalda",S,55,10,55),
+  traccion_1brazo: ex("traccion_1brazo","Tracción a un brazo","Espalda",P,25,10,25,true),
+  curl_scott:      ex("curl_scott","Curl en banco Scott","Bíceps",S,30,10,30),
+
+  prensa:          ex("prensa","Prensa (leg press)","Piernas",S,100,12,100),
+  sillon_cuad:     ex("sillon_cuad","Sillón de cuádriceps","Piernas",S,40,12,40),
+  camilla_isquios: ex("camilla_isquios","Camilla isquios (femoral)","Piernas",S,35,12,35),
+  gemelos:         ex("gemelos","Elevación de gemelos","Piernas",S,60,15,60),
+  plancha:         ex("plancha","Plancha","Core",S,0,1,0),
+  elev_piernas:    ex("elev_piernas","Elevación de piernas","Core",S,0,12,0),
+};
+const ROUTINES = {
+  A:{label:"A",focus:"Pecho · Hombro · Tríceps",ex:["inclinado_smith","plano_manc","aperturas","laterales_polea","press_militar","tricep_triangulo","empuje_barra"]},
+  B:{label:"B",focus:"Espalda · Bíceps (amplitud)",ex:["polea_abierta","dominadas","remo_barra","pullover","curl_barra_w","martillo"]},
+  C:{label:"C",focus:"Piernas · Core",ex:["prensa","sillon_cuad","camilla_isquios","gemelos","plancha","elev_piernas"]},
+  D:{label:"D",focus:"Pecho · Hombro · Tríceps (var.)",ex:["plano_barra","inclinado_manc","cruces_polea","laterales_polea","posteriores","fondos_maq","tricep_soga"]},
+  E:{label:"E",focus:"Espalda · Bíceps (var.)",ex:["dominadas","polea_neutro","remo_polea_baja","traccion_1brazo","curl_scott","martillo"]},
+};
+const DEFAULT_SETS = 4;
+
+/* ---------- helpers ---------- */
+const todayStr = ()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
+const localDateOf = (ms)=>{const d=new Date(ms);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
+const localTimeOf = (ms)=> new Date(ms).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
+function fmtDur(s){const m=Math.floor(s/60),x=s%60;return m+":"+String(x).padStart(2,"0");}
+function fmtWeight(w){return (w%1===0)?String(w):w.toFixed(1);}
+function dateLabel(iso){
+  const d=new Date(iso+"T12:00:00"), t=new Date(todayStr()+"T12:00:00");
+  const diff=Math.round((t-d)/86400000);
+  if(diff===0)return"Hoy"; if(diff===1)return"Ayer"; if(diff<7)return"Hace "+diff+" días";
+  return d.toLocaleDateString("es-AR",{day:"numeric",month:"short"});
+}
+function calcStreak(workouts){
+  if(!workouts.length)return 0;
+  const days=new Set(workouts.map(w=>w.date));
+  let streak=0; let cur=new Date(todayStr()+"T12:00:00");
+  // permite que la racha siga viva si entrenaste hoy o ayer
+  if(!days.has(todayStr())){ cur.setDate(cur.getDate()-1); if(!days.has(cur.toISOString().slice(0,10))) return 0; }
+  while(days.has(cur.toISOString().slice(0,10))){ streak++; cur.setDate(cur.getDate()-1); }
+  return streak;
+}
+function vol(sets,perSide){return sets.filter(s=>s.done).reduce((a,s)=>a+s.weight*(perSide?2:1)*s.reps,0);}
+
+/* ====================================================================== */
+function App(){
+  const [ready,setReady]=useState(false);
+  const [exStats,setExStats]=useState({});      // overrides por ejercicio
+  const [workouts,setWorkouts]=useState([]);
+  const [tab,setTab]=useState("home");
+  const [view,setView]=useState("home");          // home | pick | active | feel | summary | detail
+  const [session,setSession]=useState(null);
+  const [lastSummary,setLastSummary]=useState(null);
+  const [detail,setDetail]=useState(null);
+
+  useEffect(()=>{(async()=>{
+    const st=await loadState();
+    if(st){ setExStats(st.exStats||{}); setWorkouts(st.workouts||[]); }
+    setReady(true);
+  })()},[]);
+
+  const persist=(eS,wk)=>saveState({exStats:eS,workouts:wk});
+
+  // ejercicio "vivo" = semilla + overrides guardados
+  const liveEx=(id)=>({...SEED_EX[id],...(exStats[id]||{})});
+
+  function startDay(key){
+    const r=ROUTINES[key];
+    const exs=r.ex.map(id=>{
+      const e=liveEx(id);
+      const suggest = e.lastFeel==="easy" && e.lastWeight>0 ? e.lastWeight+2.5 : e.lastWeight;
+      const sets=Array.from({length:DEFAULT_SETS}).map(()=>({weight:suggest,reps:e.lastReps,done:false,feel:null}));
+      return {id,name:e.name,group:e.group,perSide:e.perSide,star:e.star,record:e.record,
+        lastWeight:e.lastWeight,lastReps:e.lastReps,lastDate:e.lastDate,suggested:suggest!==e.lastWeight,sets};
+    });
+    setSession({dayKey:key,focus:r.focus,start:Date.now(),exs});
+    setView("active");
+  }
+
+  function finishSession(){ setView("feel"); }
+
+  function saveSession(feel,durationSec){
+    const dur=durationSec || Math.round((Date.now()-session.start)/1000);
+    const dateStr=localDateOf(session.start);
+    const timeStr=localTimeOf(session.start);
+    const exData=session.exs.map(e=>({id:e.id,name:e.name,perSide:e.perSide,
+      sets:e.sets.filter(s=>s.done).map(s=>({weight:s.weight,reps:s.reps,feel:s.feel}))}))
+      .filter(e=>e.sets.length>0);
+    const totalVol=exData.reduce((a,e)=>a+vol(e.sets.map(s=>({...s,done:true})),e.perSide),0);
+    // PRs + nuevos stats
+    const prs=[]; const newStats={...exStats};
+    exData.forEach(e=>{
+      const top=e.sets.reduce((m,s)=>s.weight>m.weight?s:m,e.sets[0]);
+      const prev=liveEx(e.id);
+      if(top.weight>prev.record && top.weight>0){ prs.push({name:e.name,weight:top.weight,perSide:e.perSide}); }
+      newStats[e.id]={
+        lastWeight:top.weight, lastReps:top.reps,
+        record:Math.max(prev.record,top.weight),
+        lastFeel:top.feel||prev.lastFeel||null, lastDate:dateStr
+      };
+    });
+    const w={id:Date.now(),date:dateStr,time:timeStr,startedAt:session.start,dayKey:session.dayKey,focus:session.focus,
+      durationSec:dur,totalVolume:Math.round(totalVol),feel,exercises:exData};
+    const newWk=[w,...workouts];
+    setExStats(newStats); setWorkouts(newWk); persist(newStats,newWk);
+    setLastSummary({...w,prs}); setSession(null); setView("summary");
+  }
+
+  if(!ready) return <div style={{padding:40,textAlign:"center"}} className="muted">Cargando…</div>;
+
+  // Rutas a pantalla completa (sin tabs)
+  if(view==="pick")    return <PickDay onPick={startDay} onBack={()=>setView("home")} liveEx={liveEx}/>;
+  if(view==="active")  return <Active session={session} setSession={setSession} liveEx={liveEx} onFinish={finishSession} onCancel={()=>{setSession(null);setView("home");}}/>;
+  if(view==="feel")    return <Feel onSave={saveSession} onBack={()=>setView("active")} defaultMin={Math.max(1,Math.round((Date.now()-session.start)/60000))}/>;
+  if(view==="summary") return <Summary s={lastSummary} onDone={()=>{setTab("home");setView("home");}}/>;
+  if(view==="detail")  return <Detail w={detail} onBack={()=>setView("home")}/>;
+
+  return (<>
+    {tab==="home" && <Home workouts={workouts} onStart={()=>setView("pick")}/>}
+    {tab==="hist" && <History workouts={workouts} onOpen={(w)=>{setDetail(w);setView("detail");}}/>}
+    <Tabs tab={tab} setTab={setTab} onStart={()=>setView("pick")}/>
+  </>);
+}
+
+/* ---------------- Dashboard ---------------- */
+function Home({workouts,onStart}){
+  const streak=calcStreak(workouts);
+  const now=new Date(), mKey=now.toISOString().slice(0,7);
+  const thisMonth=workouts.filter(w=>w.date.startsWith(mKey)).length;
+  const totalVol=workouts.reduce((a,w)=>a+w.totalVolume,0);
+  const avg=workouts.length?Math.round(workouts.reduce((a,w)=>a+w.durationSec,0)/workouts.length/60):0;
+  const groups={};
+  workouts.forEach(w=>{groups[w.dayKey]=(groups[w.dayKey]||0)+1;});
+  const last=workouts[0];
+  return (<div className="screen">
+    <div className="topbar">
+      <h1>Forja</h1>
+      <div className="streak"><span>🔥</span><span className="num">{streak}</span><span className="muted" style={{fontWeight:600}}>días</span></div>
+    </div>
+    <div className="grid">
+      <div className="stat hl"><div className="v num">{workouts.length}</div><div className="l">Entrenamientos</div></div>
+      <div className="stat"><div className="v num">{thisMonth}</div><div className="l">Este mes</div></div>
+      <div className="stat"><div className="v num">{(totalVol/1000).toFixed(1)}<span style={{fontSize:16}}>t</span></div><div className="l">Volumen total</div></div>
+      <div className="stat"><div className="v num">{avg}<span style={{fontSize:16}}>m</span></div><div className="l">Promedio / sesión</div></div>
+    </div>
+
+    {last && (<div className="card">
+      <h3>Último entrenamiento</h3>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div><div style={{fontWeight:800,fontSize:16}}>Día {last.dayKey} · {last.focus}</div>
+          <div className="muted" style={{fontSize:13,marginTop:2}}>{dateLabel(last.date)}{last.time?" · "+last.time+"h":""} · {last.totalVolume.toLocaleString("es-AR")} kg · {fmtDur(last.durationSec)}</div></div>
+        <div className="num" style={{fontFamily:"Archivo",fontWeight:900,fontSize:26,color:"var(--accent)"}}>{last.dayKey}</div>
+      </div>
+    </div>)}
+
+    {workouts.length>0 && (<div className="card">
+      <h3>Frecuencia por día</h3>
+      <div style={{display:"flex",gap:8,marginTop:4}}>
+        {["A","B","C","D","E"].map(k=>{
+          const c=groups[k]||0, max=Math.max(1,...Object.values(groups));
+          return (<div key={k} style={{flex:1,textAlign:"center"}}>
+            <div style={{height:60,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+              <div style={{width:"70%",height:Math.max(6,(c/max)*60),background:c?"var(--accent)":"var(--line)",borderRadius:6}}/>
+            </div>
+            <div className="num" style={{fontWeight:800,marginTop:4}}>{c}</div>
+            <div className="muted" style={{fontSize:11,fontWeight:700}}>{k}</div>
+          </div>);
+        })}
+      </div>
+    </div>)}
+
+    <button className="cta" onClick={onStart}>⚡ ENTRENAR</button>
+  </div>);
+}
+
+/* ---------------- Elegir día ---------------- */
+function PickDay({onPick,onBack,liveEx}){
+  return (<div className="screen">
+    <button className="back" onClick={onBack}>‹ Volver</button>
+    <h1 className="display" style={{fontWeight:900,fontSize:26,margin:"4px 0 4px"}}>¿Qué entrenás?</h1>
+    <p className="muted" style={{marginTop:0,fontSize:14}}>Un toque y te cargo los ejercicios con tus pesos.</p>
+    {Object.keys(ROUTINES).map(k=>{
+      const r=ROUTINES[k];
+      return (<button key={k} className="day" onClick={()=>onPick(k)}>
+        <div className="badge">{r.label}</div>
+        <div style={{flex:1}}>
+          <div className="t">Día {r.label}</div>
+          <div className="s">{r.focus}</div>
+        </div>
+        <div className="muted num" style={{fontWeight:800}}>{r.ex.length} ej.</div>
+      </button>);
+    })}
+  </div>);
+}
+
+/* ---------------- Entrenamiento activo ---------------- */
+function Active({session,setSession,liveEx,onFinish,onCancel}){
+  const [elapsed,setElapsed]=useState(0);
+  const [rest,setRest]=useState(null); // segundos restantes
+  const [picker,setPicker]=useState(false);
+  const restRef=useRef(null);
+  useEffect(()=>{const i=setInterval(()=>setElapsed(Math.round((Date.now()-session.start)/1000)),1000);return()=>clearInterval(i);},[session.start]);
+
+  useEffect(()=>{
+    if(rest===null)return;
+    if(rest<=0){ beep(); if(navigator.vibrate)navigator.vibrate([120,60,120]); setRest(null); return; }
+    restRef.current=setTimeout(()=>setRest(r=>r-1),1000);
+    return()=>clearTimeout(restRef.current);
+  },[rest]);
+
+  function beep(){try{const c=new (window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.15;o.start();o.stop(c.currentTime+.25);}catch(e){}}
+
+  function update(exi,fn){const exs=session.exs.map((e,i)=>i===exi?fn({...e,sets:e.sets.map(s=>({...s}))}):e);setSession({...session,exs});}
+  function toggle(exi,si){
+    update(exi,e=>{const s=e.sets[si];s.done=!s.done;e.sets[si]=s;
+      if(s.done){setRest(90);if(navigator.vibrate)navigator.vibrate(15);} return e;});
+  }
+  function adj(exi,si,field,delta){update(exi,e=>{const s=e.sets[si];s[field]=Math.max(0,+(s[field]+delta).toFixed(1));e.sets[si]=s;return e;});}
+  function setFeel(exi,si,f){update(exi,e=>{const s=e.sets[si];s.feel=s.feel===f?null:f;e.sets[si]=s;return e;});}
+  function addSet(exi){update(exi,e=>{const last=e.sets[e.sets.length-1]||{weight:e.lastWeight,reps:e.lastReps};e.sets.push({weight:last.weight,reps:last.reps,done:false,feel:null});return e;});}
+  function rmSet(exi){update(exi,e=>{if(e.sets.length>1)e.sets.pop();return e;});}
+  function rmEx(exi){setSession({...session,exs:session.exs.filter((_,i)=>i!==exi)});}
+  function addExercise(id){
+    const e=liveEx(id);
+    const suggest=e.lastFeel==="easy"&&e.lastWeight>0?e.lastWeight+2.5:e.lastWeight;
+    const sets=Array.from({length:DEFAULT_SETS}).map(()=>({weight:suggest,reps:e.lastReps,done:false,feel:null}));
+    const ne={id,name:e.name,group:e.group,perSide:e.perSide,star:e.star,record:e.record,
+      lastWeight:e.lastWeight,lastReps:e.lastReps,lastDate:e.lastDate,suggested:suggest!==e.lastWeight,sets};
+    setSession({...session,exs:[...session.exs,ne]});
+    setPicker(false);
+  }
+  const used=new Set(session.exs.map(e=>e.id));
+  const byGroup={};
+  Object.values(SEED_EX).filter(e=>!used.has(e.id)).forEach(e=>{(byGroup[e.group]=byGroup[e.group]||[]).push(e);});
+
+  const doneSets=session.exs.reduce((a,e)=>a+e.sets.filter(s=>s.done).length,0);
+  const curVol=Math.round(session.exs.reduce((a,e)=>a+vol(e.sets,e.perSide),0));
+
+  return (<div className="screen">
+    <div className="topbar" style={{paddingBottom:10}}>
+      <div>
+        <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+          <h1 style={{fontSize:24}}>Día {session.dayKey}</h1>
+          <span className="muted" style={{fontWeight:700,fontSize:13}}>{doneSets} series</span>
+        </div>
+        <div className="muted" style={{fontSize:13,fontWeight:600}}>{session.focus}</div>
+      </div>
+      <div style={{textAlign:"right"}}>
+        <div className="num accent" style={{fontFamily:"Archivo",fontWeight:900,fontSize:24}}>{fmtDur(elapsed)}</div>
+        <div className="muted" style={{fontSize:11,fontWeight:700}}>{curVol.toLocaleString("es-AR")} kg</div>
+      </div>
+    </div>
+
+    {session.exs.map((e,exi)=>(
+      <div className="card" key={exi}>
+        <div className="exh">
+          <div className="name">{e.name}</div>
+          <button className="rmex" onClick={()=>rmEx(exi)}>quitar</button>
+        </div>
+        <div className="meta">
+          {e.star && <span className="chip star">⭐ prioridad</span>}
+          {e.lastDate && <span className="chip">Última: {fmtWeight(e.lastWeight)}{e.perSide?"/lado":"kg"} · {dateLabel(e.lastDate)}</span>}
+          {e.record>0 && <span className="chip rec">PR {fmtWeight(e.record)}{e.perSide?"/lado":"kg"}</span>}
+          {e.suggested && <span className="chip sug">💡 progresión sugerida</span>}
+        </div>
+        {e.sets.map((s,si)=>(
+          <div key={si}>
+            <div className={"setrow"+(s.done?" done":"")}>
+              <div className="n num">{si+1}</div>
+              <div className="stepper">
+                <button onClick={()=>adj(exi,si,"weight",-2.5)}>–</button>
+                <div className="val"><span className="big num">{fmtWeight(s.weight)}</span><span className="u">{e.perSide?"kg/lado":"kg"}</span></div>
+                <button onClick={()=>adj(exi,si,"weight",2.5)}>+</button>
+              </div>
+              <div className="stepper">
+                <button onClick={()=>adj(exi,si,"reps",-1)}>–</button>
+                <div className="val"><span className="big num">{s.reps}</span><span className="u">reps</span></div>
+                <button onClick={()=>adj(exi,si,"reps",1)}>+</button>
+              </div>
+              <button className={"check"+(s.done?" done":"")} onClick={()=>toggle(exi,si)}>{s.done?"✓":""}</button>
+            </div>
+            {s.done && (<div className="feelrow">
+              <button className={"feelchip easy"+(s.feel==="easy"?" on":"")} onClick={()=>setFeel(exi,si,"easy")}>fácil</button>
+              <button className={"feelchip ok"+(s.feel==="ok"?" on":"")} onClick={()=>setFeel(exi,si,"ok")}>justo</button>
+              <button className={"feelchip fail"+(s.feel==="fail"?" on":"")} onClick={()=>setFeel(exi,si,"fail")}>al fallo</button>
+            </div>)}
+          </div>
+        ))}
+        <div style={{display:"flex",gap:18,marginTop:10}}>
+          <button className="addset" onClick={()=>addSet(exi)}>+ serie</button>
+          {e.sets.length>1 && <button className="addset" style={{color:"var(--muted)"}} onClick={()=>rmSet(exi)}>– serie</button>}
+        </div>
+      </div>
+    ))}
+
+    <button className="cta ghost" style={{marginTop:14}} onClick={()=>setPicker(true)}>+ Agregar ejercicio</button>
+    <button className="cta ghost" style={{marginTop:10,color:"var(--muted)"}} onClick={onCancel}>Cancelar entrenamiento</button>
+
+    {picker && (<div className="sheet-bg" onClick={()=>setPicker(false)}>
+      <div className="sheet" onClick={e=>e.stopPropagation()}>
+        <h2>Agregar ejercicio</h2>
+        <div className="muted" style={{fontSize:13}}>Tocá uno para sumarlo a la sesión.</div>
+        {Object.keys(byGroup).map(g=>(
+          <div key={g}>
+            <div className="gh">{g}</div>
+            {byGroup[g].map(e=>(
+              <button key={e.id} className="pick" onClick={()=>addExercise(e.id)}>
+                <span className="pn">{e.star?"⭐ ":""}{e.name}</span><span className="pl">+</span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>)}
+
+    {rest!==null && (<div className="rest">
+      <div className="rest-inner">
+        <div><small>Descanso</small><div className="time num">{fmtDur(rest)}</div></div>
+        <button className="adj" onClick={()=>setRest(r=>Math.max(0,r-15))}>−15</button>
+        <button className="adj" onClick={()=>setRest(r=>r+15)}>+15</button>
+        <button className="skip" onClick={()=>setRest(null)}>saltar</button>
+      </div>
+    </div>)}
+
+    <div className="finishbar"><button className="cta" onClick={onFinish}>Finalizar entrenamiento ✓</button></div>
+  </div>);
+}
+
+/* ---------------- Esfuerzo percibido ---------------- */
+function Feel({onSave,onBack,defaultMin}){
+  const [feel,setFeel]=useState(null);
+  const [energy,setEnergy]=useState(null);
+  const [fatigue,setFatigue]=useState(null);
+  const [min,setMin]=useState(defaultMin||45);
+  return (<div className="screen">
+    <button className="back" onClick={onBack}>‹ Volver al entrenamiento</button>
+    <h1 className="display" style={{fontWeight:900,fontSize:26,margin:"4px 0 14px"}}>¿Cómo estuvo?</h1>
+
+    <div className="card">
+      <h3>Duración</h3>
+      <div className="stepper" style={{maxWidth:220,margin:"2px auto 0"}}>
+        <button onClick={()=>setMin(m=>Math.max(1,m-5))}>–</button>
+        <div className="val"><span className="big num">{min}</span><span className="u">minutos</span></div>
+        <button onClick={()=>setMin(m=>m+5)}>+</button>
+      </div>
+    </div>
+
+    <div className="card">
+      <h3>Sensación general</h3>
+      <div className="bigfeel">
+        {[["floja","😟","Floja"],["buena","😐","Buena"],["genial","🔥","Genial"]].map(([v,e,l])=>(
+          <button key={v} className={feel===v?"sel":""} onClick={()=>setFeel(v)}><span className="e">{e}</span>{l}</button>
+        ))}
+      </div>
+    </div>
+    <div className="card">
+      <h3>Energía previa</h3>
+      <div className="seg">{["Baja","Media","Alta"].map(v=><button key={v} className={energy===v?"sel":""} onClick={()=>setEnergy(v)}>{v}</button>)}</div>
+    </div>
+    <div className="card">
+      <h3>Fatiga posterior</h3>
+      <div className="seg">{["Baja","Media","Alta"].map(v=><button key={v} className={fatigue===v?"sel":""} onClick={()=>setFatigue(v)}>{v}</button>)}</div>
+    </div>
+
+    <button className="cta" disabled={!feel} style={{opacity:feel?1:.4}} onClick={()=>onSave({general:feel,energy,fatigue},min*60)}>Guardar entrenamiento</button>
+  </div>);
+}
+
+/* ---------------- Resumen ---------------- */
+function Summary({s,onDone}){
+  return (<div className="screen" style={{textAlign:"center"}}>
+    <div style={{fontSize:48,marginTop:20}}>💪</div>
+    <h1 className="display" style={{fontWeight:900,fontSize:26,margin:"6px 0 2px"}}>¡Sesión guardada!</h1>
+    <div className="muted" style={{fontSize:14}}>Día {s.dayKey} · {s.focus}</div>
+
+    <div className="grid" style={{marginTop:20,textAlign:"left"}}>
+      <div className="stat hl"><div className="v num">{s.totalVolume.toLocaleString("es-AR")}<span style={{fontSize:15}}> kg</span></div><div className="l">Volumen</div></div>
+      <div className="stat"><div className="v num">{fmtDur(s.durationSec)}</div><div className="l">Duración</div></div>
+      <div className="stat"><div className="v num">{s.exercises.length}</div><div className="l">Ejercicios</div></div>
+      <div className="stat"><div className="v num">{s.exercises.reduce((a,e)=>a+e.sets.length,0)}</div><div className="l">Series</div></div>
+    </div>
+
+    {s.prs.length>0 && (<div style={{marginTop:16,textAlign:"left"}}>
+      {s.prs.map((p,i)=>(<div className="prline" key={i}>🏆 ¡Nuevo récord! {p.name} — {fmtWeight(p.weight)}{p.perSide?"/lado":" kg"}</div>))}
+    </div>)}
+
+    <button className="cta" style={{marginTop:24}} onClick={onDone}>Listo</button>
+  </div>);
+}
+
+/* ---------------- Historial ---------------- */
+function History({workouts,onOpen}){
+  return (<div className="screen">
+    <div className="topbar"><h1>Historial</h1><span className="muted num" style={{fontWeight:700}}>{workouts.length}</span></div>
+    {workouts.length===0 && <div className="empty"><div className="em">📋</div>Todavía no registraste entrenamientos.<br/>Tocá <b className="accent">Entrenar</b> para arrancar.</div>}
+    {workouts.map(w=>(
+      <button key={w.id} className="hrow" style={{width:"100%",textAlign:"left"}} onClick={()=>onOpen(w)}>
+        <div>
+          <div style={{fontWeight:800,fontSize:15}}>Día {w.dayKey} · {w.focus}</div>
+          <div className="muted" style={{fontSize:13,marginTop:2}}>{dateLabel(w.date)}{w.time?" · "+w.time+"h":""} · {w.totalVolume.toLocaleString("es-AR")} kg · {fmtDur(w.durationSec)}</div>
+        </div>
+        <div className="dot num">{w.dayKey} ›</div>
+      </button>
+    ))}
+  </div>);
+}
+function Detail({w,onBack}){
+  return (<div className="screen">
+    <button className="back" onClick={onBack}>‹ Volver</button>
+    <h1 className="display" style={{fontWeight:900,fontSize:24,margin:"4px 0 0"}}>Día {w.dayKey}</h1>
+    <div className="muted" style={{fontSize:14}}>{dateLabel(w.date)}{w.time?" · "+w.time+"h":""} · {w.focus}</div>
+    <div className="grid" style={{marginTop:14}}>
+      <div className="stat"><div className="v num">{w.totalVolume.toLocaleString("es-AR")}</div><div className="l">Volumen kg</div></div>
+      <div className="stat"><div className="v num">{fmtDur(w.durationSec)}</div><div className="l">Duración</div></div>
+    </div>
+    {w.exercises.map((e,i)=>(
+      <div className="card" key={i}>
+        <h3 style={{color:"var(--text)",textTransform:"none",fontSize:15,letterSpacing:0}}>{e.name}</h3>
+        {e.sets.map((s,j)=>(
+          <div className="detline" key={j}>
+            <span className="muted num">Serie {j+1}</span>
+            <span className="num" style={{fontWeight:700}}>{fmtWeight(s.weight)}{e.perSide?"/lado":"kg"} × {s.reps}{s.feel?" · "+({easy:"fácil",ok:"justo",fail:"al fallo"}[s.feel]):""}</span>
+          </div>
+        ))}
+      </div>
+    ))}
+  </div>);
+}
+
+/* ---------------- Tabs ---------------- */
+function Tabs({tab,setTab,onStart}){
+  return (<div className="tabs">
+    <button className={"tab"+(tab==="home"?" on":"")} onClick={()=>setTab("home")}><span className="ic">⌂</span>Inicio</button>
+    <button className="tab" onClick={onStart}><span className="ic">⚡</span>Entrenar</button>
+    <button className={"tab"+(tab==="hist"?" on":"")} onClick={()=>setTab("hist")}><span className="ic">≣</span>Historial</button>
+  </div>);
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
