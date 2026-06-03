@@ -40,7 +40,7 @@
   button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
   .num{font-family:'Archivo',sans-serif;font-variant-numeric:tabular-nums;}
   .display{font-family:'Archivo',sans-serif;letter-spacing:-0.02em;}
-  .screen{padding:18px 16px 110px;animation:fade .25s ease;}
+  .screen{padding:calc(20px + env(safe-area-inset-top)) 16px 110px;animation:fade .25s ease;}
   @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
   .muted{color:var(--muted);}
   .accent{color:var(--accent);}
@@ -150,7 +150,11 @@
   .empty{text-align:center;color:var(--muted);padding:48px 20px;}
   .empty .em{font-size:40px;margin-bottom:10px;}
 
-  .back{color:var(--muted);font-weight:700;font-size:14px;margin-bottom:6px;display:inline-flex;gap:6px;align-items:center;}
+  .back{color:var(--text);font-weight:700;font-size:14px;margin-bottom:12px;display:inline-flex;gap:6px;align-items:center;background:var(--panel);border:1px solid var(--line);padding:10px 16px;border-radius:999px;}
+  .back:active{background:var(--panel-2);}
+  .ins{padding:14px 16px;}
+  .ins.warn{border-color:#5a4a18;background:#1c190e;}
+  .ins.good{border-color:#2e6b38;background:#11201a;}
   .detline{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;}
   .detline:last-child{border:none;}
 
@@ -257,6 +261,17 @@ function calcStreak(workouts){
   return streak;
 }
 function vol(sets,perSide){return sets.filter(s=>s.done).reduce((a,s)=>a+s.weight*(perSide?2:1)*s.reps,0);}
+const groupOf=(id)=>SEED_EX[id]?SEED_EX[id].group:"Otro";
+function daysAgo(d){return Math.round((new Date(todayStr()+"T12:00:00")-new Date(d+"T12:00:00"))/86400000);}
+function downloadJSON(filename,obj){
+  try{
+    const blob=new Blob([JSON.stringify(obj,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download=filename; document.body.appendChild(a); a.click();
+    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},800);
+  }catch(e){ alert("No pude generar el archivo en este navegador."); }
+}
 
 /* ====================================================================== */
 function App(){
@@ -276,6 +291,16 @@ function App(){
   })()},[]);
 
   const persist=(eS,wk)=>saveState({exStats:eS,workouts:wk});
+
+  function importData(parsed){
+    try{
+      const wk=Array.isArray(parsed.entrenamientos)?parsed.entrenamientos:(Array.isArray(parsed.workouts)?parsed.workouts:null);
+      if(!wk){ alert("El archivo no parece un backup de Forja."); return; }
+      const es=parsed.exStats||{};
+      setWorkouts(wk); setExStats(es); persist(es,wk);
+      alert("¡Listo! Importé "+wk.length+" entrenamientos.");
+    }catch(e){ alert("No pude leer el archivo."); }
+  }
 
   // ejercicio "vivo" = semilla + overrides guardados
   const liveEx=(id)=>({...SEED_EX[id],...(exStats[id]||{})});
@@ -333,6 +358,7 @@ function App(){
 
   return (<>
     {tab==="home" && <Home workouts={workouts} onStart={()=>setView("pick")}/>}
+    {tab==="coach" && <Coach workouts={workouts} exStats={exStats} onImport={importData}/>}
     {tab==="hist" && <History workouts={workouts} onOpen={(w)=>{setDetail(w);setView("detail");}}/>}
     <Tabs tab={tab} setTab={setTab} onStart={()=>setView("pick")}/>
   </>);
@@ -343,7 +369,7 @@ function Home({workouts,onStart}){
   const streak=calcStreak(workouts);
   const now=new Date(), mKey=now.toISOString().slice(0,7);
   const thisMonth=workouts.filter(w=>w.date.startsWith(mKey)).length;
-  const totalVol=workouts.reduce((a,w)=>a+w.totalVolume,0);
+  const wk7=workouts.filter(w=>{const a=new Date(todayStr()+"T12:00:00"),b=new Date(w.date+"T12:00:00");return (a-b)/86400000<7;}).length;
   const avg=workouts.length?Math.round(workouts.reduce((a,w)=>a+w.durationSec,0)/workouts.length/60):0;
   const groups={};
   workouts.forEach(w=>{groups[w.dayKey]=(groups[w.dayKey]||0)+1;});
@@ -355,8 +381,8 @@ function Home({workouts,onStart}){
     </div>
     <div className="grid">
       <div className="stat hl"><div className="v num">{workouts.length}</div><div className="l">Entrenamientos</div></div>
+      <div className="stat"><div className="v num">{wk7}</div><div className="l">Esta semana</div></div>
       <div className="stat"><div className="v num">{thisMonth}</div><div className="l">Este mes</div></div>
-      <div className="stat"><div className="v num">{(totalVol/1000).toFixed(1)}<span style={{fontSize:16}}>t</span></div><div className="l">Volumen total</div></div>
       <div className="stat"><div className="v num">{avg}<span style={{fontSize:16}}>m</span></div><div className="l">Promedio / sesión</div></div>
     </div>
 
@@ -643,10 +669,118 @@ function Detail({w,onBack}){
   </div>);
 }
 
-/* ---------------- Tabs ---------------- */
+/* ---------------- Coach (conclusiones automáticas) ---------------- */
+function Coach({workouts,exStats,onImport}){
+  const liveEx=(id)=>({...SEED_EX[id],...(exStats[id]||{})});
+  const fileRef=useRef(null);
+
+  function doExport(){
+    const ejercicios={};
+    Object.keys(SEED_EX).forEach(id=>{const e=liveEx(id);ejercicios[id]={nombre:e.name,grupo:e.group,record:e.record,ultimoPeso:e.lastWeight,ultimaFecha:e.lastDate||null};});
+    downloadJSON("forja-export-"+todayStr()+".json",{app:"Forja",version:1,exportadoEl:new Date().toISOString(),totalEntrenamientos:workouts.length,entrenamientos:workouts,exStats:exStats,ejercicios:ejercicios});
+  }
+  function onFile(ev){
+    const f=ev.target.files&&ev.target.files[0]; if(!f) return;
+    const reader=new FileReader();
+    reader.onload=()=>{ try{ const parsed=JSON.parse(reader.result);
+      if(window.confirm("Esto reemplazará tus datos actuales por los del archivo. ¿Seguir?")) onImport(parsed);
+    }catch(e){ alert("No pude leer el archivo (¿es un JSON de Forja?)."); } };
+    reader.readAsText(f); ev.target.value="";
+  }
+  const dataCard=(
+    <div className="card">
+      <h3>Tus datos</h3>
+      <button className="cta ghost" style={{marginTop:0}} onClick={doExport}>⬇️ Descargar entrenamientos</button>
+      <button className="cta ghost" style={{marginTop:10}} onClick={()=>fileRef.current&&fileRef.current.click()}>⬆️ Importar backup</button>
+      <input type="file" accept="application/json,.json" ref={fileRef} onChange={onFile} style={{display:"none"}}/>
+      <p style={{fontSize:12.5,color:"var(--muted)",margin:"12px 0 0",lineHeight:1.5}}>Bajá el archivo y subílo a tu proyecto de Claude para que lo analice a fondo. También te sirve de respaldo si cambiás de teléfono.</p>
+    </div>
+  );
+
+  if(workouts.length<2){
+    return (<div className="screen">
+      <div className="topbar"><h1>Coach</h1></div>
+      <div className="empty"><div className="em">🧠</div>Cargá un par de entrenamientos y acá te voy sacando conclusiones solo. Mientras tanto, ya podés descargar o importar tus datos abajo.</div>
+      {dataCard}
+    </div>);
+  }
+
+  const tracked=["Pecho","Espalda","Hombro","Bíceps","Tríceps","Piernas","Core"];
+  const PUSH=["Pecho","Hombro","Tríceps"], PULL=["Espalda","Bíceps"];
+  const setsIn=(d0,d1)=>{const m={};workouts.forEach(w=>{const a=daysAgo(w.date);if(a>=d0&&a<d1)w.exercises.forEach(e=>{const g=groupOf(e.id);m[g]=(m[g]||0)+e.sets.length;});});return m;};
+  const wk=setsIn(0,7), prevWk=setsIn(7,14), all14=setsIn(0,14);
+  const totW=Object.values(wk).reduce((a,b)=>a+b,0), totP=Object.values(prevWk).reduce((a,b)=>a+b,0);
+  const week=workouts.filter(w=>daysAgo(w.date)<7);
+  const lastByGroup={}; workouts.forEach(w=>w.exercises.forEach(e=>{const g=groupOf(e.id);if(!lastByGroup[g]||w.date>lastByGroup[g])lastByGroup[g]=w.date;}));
+  const mKey=todayStr().slice(0,7);
+  const month=workouts.filter(w=>w.date.startsWith(mKey));
+  const diasMes=new Set(month.map(w=>w.date)).size;
+
+  const ins=[];
+  ins.push({t:"info",icon:"📅",title:"Tu semana",text:`${week.length} entrenamiento${week.length===1?"":"s"} y ${totW} series en los últimos 7 días.`});
+
+  if(totP>0){const dif=totW-totP;
+    if(dif>=3) ins.push({t:"good",icon:"📈",title:"Subiendo",text:`${dif} series más que la semana pasada (${totP}→${totW}). Buena progresión de volumen.`});
+    else if(dif<=-3) ins.push({t:"warn",icon:"📉",title:"Bajó el volumen",text:`${-dif} series menos que la semana pasada (${totP}→${totW}). Recuperá el ritmo si podés.`});
+  }
+
+  if(week.length===0) ins.push({t:"warn",icon:"⏰",title:"Sin entrenar esta semana",text:"Hace más de 7 días que no registrás. Volvé al ruedo aunque sea con una sesión corta."});
+  else if(week.length>=4) ins.push({t:"good",icon:"🔥",title:"Buen ritmo",text:`${week.length} sesiones en 7 días. Así se llega a diciembre.`});
+
+  // Récords recientes (superaste tu mejor marca conocida)
+  const maxOf={}; Object.keys(SEED_EX).forEach(id=>maxOf[id]=SEED_EX[id].record||0);
+  const prMap={};
+  [...workouts].reverse().forEach(w=>w.exercises.forEach(e=>{const top=e.sets.reduce((m,s)=>Math.max(m,s.weight),0);if(top>(maxOf[e.id]||0)){maxOf[e.id]=top;prMap[e.id]={date:w.date,name:e.name,perSide:e.perSide,w:top};}}));
+  Object.values(prMap).filter(p=>daysAgo(p.date)<=14&&p.w>0).slice(0,3).forEach(p=>ins.push({t:"good",icon:"🏆",title:"Récord reciente",text:`${p.name}: nueva mejor marca de ${fmtWeight(p.w)}${p.perSide?"/lado":" kg"}. ¡A romperla otra vez!`}));
+
+  const cero=tracked.filter(g=>!wk[g]);
+  if(cero.length) ins.push({t:"warn",icon:"🎯",title:"No tocaste esta semana",text:cero.join(", ")+"."+(cero.includes("Piernas")?" Piernas es tu punto débil — un día C suma muchísimo.":"")});
+
+  const flojos=tracked.filter(g=>wk[g]>0&&wk[g]<8);
+  if(flojos.length) ins.push({t:"warn",icon:"🪫",title:"Poco volumen",text:flojos.map(g=>`${g} (${wk[g]})`).join(", ")+". Apuntá a ~10+ series por grupo por semana."});
+
+  const push=PUSH.reduce((a,g)=>a+(all14[g]||0),0), pull=PULL.reduce((a,g)=>a+(all14[g]||0),0);
+  if(push>0&&pull>0){
+    if(push>pull*1.6) ins.push({t:"warn",icon:"⚖️",title:"Desbalance empuje/tracción",text:`Bastante más empuje (${push}) que tracción (${pull}) en 2 semanas. Sumá espalda y bíceps para equilibrar postura y estética.`});
+    else if(pull>push*1.6) ins.push({t:"warn",icon:"⚖️",title:"Desbalance empuje/tracción",text:`Más tracción (${pull}) que empuje (${push}) en 2 semanas. Sumá pecho, hombro o tríceps.`});
+  }
+
+  const olvidados=tracked.filter(g=>lastByGroup[g]&&daysAgo(lastByGroup[g])>=10);
+  if(olvidados.length) ins.push({t:"warn",icon:"🕸️",title:"Hace rato que no…",text:olvidados.map(g=>`${g} (hace ${daysAgo(lastByGroup[g])} días)`).join(", ")+"."});
+
+  // Estancamientos + sugerencia de variante
+  const perEx={};
+  [...workouts].reverse().forEach(w=>w.exercises.forEach(e=>{const top=e.sets.reduce((m,s)=>Math.max(m,s.weight),0);(perEx[e.id]=perEx[e.id]||[]).push({date:w.date,top,name:e.name,perSide:e.perSide,id:e.id});}));
+  const stalls=[];
+  Object.values(perEx).forEach(arr=>{if(arr.length<3)return;const l3=arr.slice(-3);if(l3[2].top<=l3[0].top&&l3[0].top>0&&daysAgo(arr[arr.length-1].date)<=21)stalls.push(arr[arr.length-1]);});
+  stalls.slice(0,3).forEach(s=>{const alt=Object.values(SEED_EX).find(x=>x.group===groupOf(s.id)&&x.id!==s.id);ins.push({t:"warn",icon:"🧱",title:"Estancado",text:`${s.name}: 3 sesiones sin pasar de ${fmtWeight(s.top)}${s.perSide?"/lado":" kg"}. Probá +1 rep por serie o microsalto de 1-2,5 kg${alt?`, o variá con ${alt.name}`:""}.`});});
+
+  const prog=[]; Object.keys(exStats).forEach(id=>{const e=liveEx(id);if(e.lastFeel==="easy"&&e.lastWeight>0)prog.push(e);});
+  prog.slice(0,3).forEach(e=>ins.push({t:"good",icon:"⬆️",title:"Subí el peso",text:`${e.name}: tu última serie fue "fácil" → probá ${fmtWeight(e.lastWeight+2.5)}${e.perSide?"/lado":" kg"}.`}));
+
+  ins.push({t:"info",icon:"🗓️",title:"Este mes",text:`${month.length} entrenamientos en ${diasMes} día${diasMes===1?"":"s"} distintos.`});
+
+  return (<div className="screen">
+    <div className="topbar"><h1>Coach</h1><span className="muted" style={{fontSize:11,fontWeight:700}}>auto · sin internet</span></div>
+    {ins.map((x,i)=>(
+      <div className={"card ins "+x.t} key={i}>
+        <div style={{display:"flex",gap:11,alignItems:"flex-start"}}>
+          <div style={{fontSize:21,lineHeight:1.1}}>{x.icon}</div>
+          <div>
+            <div style={{fontWeight:800,fontSize:15}}>{x.title}</div>
+            <div style={{fontSize:13.5,marginTop:3,lineHeight:1.45,color:"#C7CBD2"}}>{x.text}</div>
+          </div>
+        </div>
+      </div>
+    ))}
+    {dataCard}
+  </div>);
+}
+
 function Tabs({tab,setTab,onStart}){
   return (<div className="tabs">
     <button className={"tab"+(tab==="home"?" on":"")} onClick={()=>setTab("home")}><span className="ic">⌂</span>Inicio</button>
+    <button className={"tab"+(tab==="coach"?" on":"")} onClick={()=>setTab("coach")}><span className="ic">🧠</span>Coach</button>
     <button className="tab" onClick={onStart}><span className="ic">⚡</span>Entrenar</button>
     <button className={"tab"+(tab==="hist"?" on":"")} onClick={()=>setTab("hist")}><span className="ic">≣</span>Historial</button>
   </div>);
