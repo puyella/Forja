@@ -155,6 +155,7 @@
   .ins{padding:14px 16px;}
   .ins.warn{border-color:#5a4a18;background:#1c190e;}
   .ins.good{border-color:#2e6b38;background:#11201a;}
+  .dateinput{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);font-family:'Manrope',sans-serif;font-weight:700;font-size:16px;padding:13px 14px;border-radius:12px;color-scheme:dark;}
   .detline{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;}
   .detline:last-child{border:none;}
 
@@ -229,6 +230,45 @@ const SEED_EX = {
   gemelos:         ex("gemelos","Elevación de gemelos","Piernas",S,60,15,60),
   plancha:         ex("plancha","Plancha","Core",S,0,1,0),
   elev_piernas:    ex("elev_piernas","Elevación de piernas","Core",S,0,12,0),
+
+  // ---- Ejercicios genéricos para agregar sobre la marcha ----
+  sentadilla:      ex("sentadilla","Sentadilla libre","Piernas",S,0,10,0),
+  hack_squat:      ex("hack_squat","Hack squat","Piernas",S,0,10,0),
+  peso_muerto:     ex("peso_muerto","Peso muerto","Espalda",S,0,8,0),
+  peso_muerto_rum: ex("peso_muerto_rum","Peso muerto rumano","Piernas",S,0,10,0),
+  zancadas:        ex("zancadas","Zancadas (estocadas)","Piernas",P,0,12,0),
+  bulgara:         ex("bulgara","Sentadilla búlgara","Piernas",P,0,12,0),
+  hip_thrust:      ex("hip_thrust","Hip thrust (empuje de cadera)","Piernas",S,0,12,0),
+  prensa_horiz:    ex("prensa_horiz","Prensa horizontal","Piernas",S,0,12,0),
+  abductores:      ex("abductores","Abductores en máquina","Piernas",S,0,15,0),
+  aductores:       ex("aductores","Aductores en máquina","Piernas",S,0,15,0),
+  sentadilla_gob:  ex("sentadilla_gob","Sentadilla goblet","Piernas",S,0,12,0),
+
+  remo_mancuerna:  ex("remo_mancuerna","Remo con mancuerna","Espalda",P,0,10,0),
+  remo_t:          ex("remo_t","Remo en T (T-bar)","Espalda",S,0,10,0),
+  jalon_tras_nuca: ex("jalon_tras_nuca","Jalón tras nuca","Espalda",S,0,10,0),
+  encogimientos:   ex("encogimientos","Encogimientos (shrugs)","Espalda",P,0,15,0),
+
+  press_declinado: ex("press_declinado","Press declinado","Pecho",S,0,10,0),
+  aperturas_manc:  ex("aperturas_manc","Aperturas con mancuernas","Pecho",P,0,12,0),
+  fondos_pecho:    ex("fondos_pecho","Fondos en paralelas (pecho)","Pecho",S,0,10,0),
+
+  elev_frontales:  ex("elev_frontales","Elevaciones frontales","Hombro",P,0,12,0),
+  press_arnold:    ex("press_arnold","Press Arnold","Hombro",P,0,10,0),
+  pajaros:         ex("pajaros","Pájaros (vuelos posteriores)","Hombro",P,0,15,0),
+
+  curl_mancuernas: ex("curl_mancuernas","Curl con mancuernas","Bíceps",P,0,10,0),
+  curl_concentrado:ex("curl_concentrado","Curl concentrado","Bíceps",P,0,12,0),
+  curl_polea:      ex("curl_polea","Curl en polea","Bíceps",S,0,12,0),
+
+  press_frances:   ex("press_frances","Press francés","Tríceps",S,0,10,0),
+  ext_sobre_cabeza:ex("ext_sobre_cabeza","Extensión sobre la cabeza","Tríceps",S,0,12,0),
+  patada_tricep:   ex("patada_tricep","Patada de tríceps","Tríceps",P,0,12,0),
+
+  rueda_abdominal: ex("rueda_abdominal","Rueda abdominal","Core",S,0,10,0),
+  crunch_maquina:  ex("crunch_maquina","Crunch en máquina","Core",S,0,15,0),
+  plancha_lateral: ex("plancha_lateral","Plancha lateral","Core",P,0,1,0),
+  elev_colgado:    ex("elev_colgado","Elevación de piernas colgado","Core",S,0,12,0),
 };
 const ROUTINES = {
   A:{label:"A",focus:"Pecho · Hombro · Tríceps",ex:["inclinado_smith","plano_manc","aperturas","laterales_polea","press_militar","tricep_triangulo","empuje_barra"]},
@@ -301,6 +341,14 @@ function App(){
       alert("¡Listo! Importé "+wk.length+" entrenamientos.");
     }catch(e){ alert("No pude leer el archivo."); }
   }
+  function updateWorkoutDate(id,newDate){
+    const nw=workouts.map(w=>w.id===id?{...w,date:newDate}:w).sort((a,b)=>(a.date<b.date?1:-1));
+    setWorkouts(nw); persist(exStats,nw);
+  }
+  function deleteWorkout(id){
+    const nw=workouts.filter(w=>w.id!==id);
+    setWorkouts(nw); persist(exStats,nw);
+  }
 
   // ejercicio "vivo" = semilla + overrides guardados
   const liveEx=(id)=>({...SEED_EX[id],...(exStats[id]||{})});
@@ -320,9 +368,9 @@ function App(){
 
   function finishSession(){ setView("feel"); }
 
-  function saveSession(feel,durationSec){
+  function saveSession(feel,durationSec,forcedDate){
     const dur=durationSec || Math.round((Date.now()-session.start)/1000);
-    const dateStr=localDateOf(session.start);
+    const dateStr=forcedDate || localDateOf(session.start);
     const timeStr=localTimeOf(session.start);
     const exData=session.exs.map(e=>({id:e.id,name:e.name,perSide:e.perSide,
       sets:e.sets.filter(s=>s.done).map(s=>({weight:s.weight,reps:s.reps,feel:s.feel}))}))
@@ -352,9 +400,9 @@ function App(){
   // Rutas a pantalla completa (sin tabs)
   if(view==="pick")    return <PickDay onPick={startDay} onBack={()=>setView("home")} liveEx={liveEx}/>;
   if(view==="active")  return <Active session={session} setSession={setSession} liveEx={liveEx} onFinish={finishSession} onCancel={()=>{setSession(null);setView("home");}}/>;
-  if(view==="feel")    return <Feel onSave={saveSession} onBack={()=>setView("active")} defaultMin={Math.max(1,Math.round((Date.now()-session.start)/60000))}/>;
+  if(view==="feel")    return <Feel onSave={saveSession} onBack={()=>setView("active")} defaultMin={Math.max(1,Math.round((Date.now()-session.start)/60000))} defaultDate={localDateOf(session.start)}/>;
   if(view==="summary") return <Summary s={lastSummary} onDone={()=>{setTab("home");setView("home");}}/>;
-  if(view==="detail")  return <Detail w={detail} onBack={()=>setView("home")}/>;
+  if(view==="detail")  return <Detail w={detail} onBack={()=>setView("home")} onEditDate={updateWorkoutDate} onDelete={deleteWorkout}/>;
 
   return (<>
     {tab==="home" && <Home workouts={workouts} onStart={()=>setView("pick")}/>}
@@ -438,24 +486,41 @@ function PickDay({onPick,onBack,liveEx}){
 /* ---------------- Entrenamiento activo ---------------- */
 function Active({session,setSession,liveEx,onFinish,onCancel}){
   const [elapsed,setElapsed]=useState(0);
-  const [rest,setRest]=useState(null); // segundos restantes
+  const [restEnd,setRestEnd]=useState(null); // timestamp ms en que termina el descanso
+  const [nowTs,setNowTs]=useState(Date.now());
   const [picker,setPicker]=useState(false);
-  const restRef=useRef(null);
+  const beeped=useRef(false);
+  const wakeRef=useRef(null);
+
+  // cronómetro de sesión: se calcula desde el inicio real, así nunca se desincroniza
   useEffect(()=>{const i=setInterval(()=>setElapsed(Math.round((Date.now()-session.start)/1000)),1000);return()=>clearInterval(i);},[session.start]);
 
+  // descanso: el restante se calcula con timestamps reales (sobrevive a que la app pase a segundo plano)
+  useEffect(()=>{ if(restEnd===null) return; const i=setInterval(()=>setNowTs(Date.now()),500); return ()=>clearInterval(i); },[restEnd]);
+  const restLeft = restEnd!==null ? Math.max(0,Math.round((restEnd-nowTs)/1000)) : null;
+
+  // aviso al llegar a 0 (suena y vibra una vez)
   useEffect(()=>{
-    if(rest===null)return;
-    if(rest<=0){ beep(); if(navigator.vibrate)navigator.vibrate([120,60,120]); setRest(null); return; }
-    restRef.current=setTimeout(()=>setRest(r=>r-1),1000);
-    return()=>clearTimeout(restRef.current);
-  },[rest]);
+    if(restEnd===null){ beeped.current=false; return; }
+    if(restLeft<=0 && !beeped.current){ beeped.current=true; beep(); if(navigator.vibrate)navigator.vibrate([120,60,120]); setTimeout(()=>setRestEnd(null),4000); }
+  },[restLeft,restEnd]);
+
+  // mantener la pantalla encendida durante el entrenamiento + recalcular al volver de segundo plano
+  useEffect(()=>{
+    async function reqWake(){ try{ if("wakeLock" in navigator){ wakeRef.current=await navigator.wakeLock.request("screen"); } }catch(e){} }
+    reqWake();
+    const onVis=()=>{ if(document.visibilityState==="visible"){ reqWake(); setNowTs(Date.now()); } };
+    document.addEventListener("visibilitychange",onVis);
+    return ()=>{ document.removeEventListener("visibilitychange",onVis); try{ wakeRef.current&&wakeRef.current.release(); }catch(e){} };
+  },[]);
 
   function beep(){try{const c=new (window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.15;o.start();o.stop(c.currentTime+.25);}catch(e){}}
+  function startRest(sec){ setRestEnd(Date.now()+sec*1000); beeped.current=false; }
 
   function update(exi,fn){const exs=session.exs.map((e,i)=>i===exi?fn({...e,sets:e.sets.map(s=>({...s}))}):e);setSession({...session,exs});}
   function toggle(exi,si){
     update(exi,e=>{const s=e.sets[si];s.done=!s.done;e.sets[si]=s;
-      if(s.done){setRest(90);if(navigator.vibrate)navigator.vibrate(15);} return e;});
+      if(s.done){startRest(90);if(navigator.vibrate)navigator.vibrate(15);} return e;});
   }
   function adj(exi,si,field,delta){update(exi,e=>{const s=e.sets[si];s[field]=Math.max(0,+(s[field]+delta).toFixed(1));e.sets[si]=s;return e;});}
   function setFeel(exi,si,f){update(exi,e=>{const s=e.sets[si];s.feel=s.feel===f?null:f;e.sets[si]=s;return e;});}
@@ -555,12 +620,13 @@ function Active({session,setSession,liveEx,onFinish,onCancel}){
       </div>
     </div>)}
 
-    {rest!==null && (<div className="rest">
+    {restEnd!==null && (<div className="rest">
       <div className="rest-inner">
-        <div><small>Descanso</small><div className="time num">{fmtDur(rest)}</div></div>
-        <button className="adj" onClick={()=>setRest(r=>Math.max(0,r-15))}>−15</button>
-        <button className="adj" onClick={()=>setRest(r=>r+15)}>+15</button>
-        <button className="skip" onClick={()=>setRest(null)}>saltar</button>
+        <div><small>Descanso</small><div className="time num">{fmtDur(restLeft)}</div></div>
+        <button className="adj" onClick={()=>setRestEnd(e=>e?Math.max(Date.now(),e-15000):e)}>−15</button>
+        <button className="adj" onClick={()=>setRestEnd(e=>e?e+15000:e)}>+15</button>
+        <button className="adj" title="Reiniciar" onClick={()=>startRest(90)}>↻</button>
+        <button className="skip" onClick={()=>setRestEnd(null)}>saltar</button>
       </div>
     </div>)}
 
@@ -569,14 +635,21 @@ function Active({session,setSession,liveEx,onFinish,onCancel}){
 }
 
 /* ---------------- Esfuerzo percibido ---------------- */
-function Feel({onSave,onBack,defaultMin}){
+function Feel({onSave,onBack,defaultMin,defaultDate}){
   const [feel,setFeel]=useState(null);
   const [energy,setEnergy]=useState(null);
   const [fatigue,setFatigue]=useState(null);
   const [min,setMin]=useState(defaultMin||45);
+  const [date,setDate]=useState(defaultDate);
   return (<div className="screen">
     <button className="back" onClick={onBack}>‹ Volver al entrenamiento</button>
     <h1 className="display" style={{fontWeight:900,fontSize:26,margin:"4px 0 14px"}}>¿Cómo estuvo?</h1>
+
+    <div className="card">
+      <h3>Fecha</h3>
+      <input type="date" className="dateinput" value={date} max={todayStr()} onChange={e=>setDate(e.target.value||defaultDate)} />
+      <p style={{fontSize:12,color:"var(--muted)",margin:"8px 0 0"}}>Si entrenaste otro día y lo cargás ahora, cambiá la fecha acá.</p>
+    </div>
 
     <div className="card">
       <h3>Duración</h3>
@@ -604,7 +677,7 @@ function Feel({onSave,onBack,defaultMin}){
       <div className="seg">{["Baja","Media","Alta"].map(v=><button key={v} className={fatigue===v?"sel":""} onClick={()=>setFatigue(v)}>{v}</button>)}</div>
     </div>
 
-    <button className="cta" disabled={!feel} style={{opacity:feel?1:.4}} onClick={()=>onSave({general:feel,energy,fatigue},min*60)}>Guardar entrenamiento</button>
+    <button className="cta" disabled={!feel} style={{opacity:feel?1:.4}} onClick={()=>onSave({general:feel,energy,fatigue},min*60,date)}>Guardar entrenamiento</button>
   </div>);
 }
 
@@ -646,12 +719,18 @@ function History({workouts,onOpen}){
     ))}
   </div>);
 }
-function Detail({w,onBack}){
+function Detail({w,onBack,onEditDate,onDelete}){
+  const [date,setDate]=useState(w.date);
   return (<div className="screen">
     <button className="back" onClick={onBack}>‹ Volver</button>
     <h1 className="display" style={{fontWeight:900,fontSize:24,margin:"4px 0 0"}}>Día {w.dayKey}</h1>
-    <div className="muted" style={{fontSize:14}}>{dateLabel(w.date)}{w.time?" · "+w.time+"h":""} · {w.focus}</div>
-    <div className="grid" style={{marginTop:14}}>
+    <div className="muted" style={{fontSize:14,marginBottom:8}}>{w.focus}{w.time?" · "+w.time+"h":""}</div>
+    <div className="card" style={{marginTop:0}}>
+      <h3>Fecha del entrenamiento</h3>
+      <input type="date" className="dateinput" value={date} max={todayStr()} onChange={e=>{const d=e.target.value||w.date;setDate(d);onEditDate(w.id,d);}} />
+      <p style={{fontSize:12,color:"var(--muted)",margin:"8px 0 0"}}>Cambiala si la registraste en el día equivocado (corrige también tu racha).</p>
+    </div>
+    <div className="grid" style={{marginTop:12}}>
       <div className="stat"><div className="v num">{w.totalVolume.toLocaleString("es-AR")}</div><div className="l">Volumen kg</div></div>
       <div className="stat"><div className="v num">{fmtDur(w.durationSec)}</div><div className="l">Duración</div></div>
     </div>
@@ -666,6 +745,7 @@ function Detail({w,onBack}){
         ))}
       </div>
     ))}
+    <button className="cta ghost" style={{marginTop:14,color:"var(--red)"}} onClick={()=>{if(window.confirm("¿Eliminar este entrenamiento? No se puede deshacer.")){onDelete(w.id);onBack();}}}>Eliminar entrenamiento</button>
   </div>);
 }
 
