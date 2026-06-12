@@ -104,7 +104,8 @@
   .stepper{display:flex;align-items:center;background:var(--panel-2);border-radius:12px;overflow:hidden;flex:1;}
   .stepper button{width:42px;height:48px;font-family:'Archivo';font-size:24px;font-weight:700;color:var(--accent);flex:0 0 auto;}
   .stepper button:active{background:#2c3320;}
-  .stepper .val{flex:1;text-align:center;}
+  .stepper .val{flex:1;text-align:center;padding:0;}
+  .stepinput{flex:1;width:100%;min-width:0;background:transparent;border:none;color:var(--accent);font-family:'Archivo',sans-serif;font-weight:800;font-size:20px;text-align:center;outline:none;padding:0;}
   .stepper .val .big{font-family:'Archivo';font-weight:800;font-size:19px;}
   .stepper .val .u{font-size:10px;color:var(--muted);display:block;margin-top:-2px;font-weight:600;}
   .stepper.wt{flex:1;}
@@ -179,6 +180,15 @@
   .newex{background:var(--panel-2);border:1px dashed var(--line);border-radius:14px;padding:12px;margin:12px 0 6px;}
   .numinput{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);font-family:'Archivo',sans-serif;font-weight:700;font-size:18px;padding:11px 12px;border-radius:11px;text-align:center;}
   .flabel{display:block;font-size:11px;color:var(--muted);font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
+  .dayseg{display:flex;gap:6px;}
+  .dayb{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 0;font-family:'Archivo',sans-serif;font-weight:800;font-size:16px;color:var(--muted);}
+  .dayb.on{background:#1b2210;border-color:var(--accent);color:var(--accent);}
+  .editrow{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-top:8px;}
+  .ebtn{width:38px;height:38px;border-radius:9px;background:var(--panel-2);color:var(--text);font-family:'Archivo',sans-serif;font-weight:800;font-size:17px;flex:0 0 auto;}
+  .ebtn:disabled{opacity:.3;}
+  .ebtn.x{color:var(--red);}
+  .prval{background:var(--panel-2);color:var(--accent);font-family:'Archivo',sans-serif;font-weight:800;font-size:14px;padding:9px 12px;border-radius:10px;flex:0 0 auto;}
+  .prinput{width:100px;background:var(--bg);border:1px solid var(--accent);color:var(--text);font-family:'Archivo',sans-serif;font-weight:800;font-size:16px;text-align:center;padding:9px;border-radius:10px;flex:0 0 auto;}
   .detline{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;}
   .detline:last-child{border:none;}
 
@@ -390,6 +400,14 @@ function App(){
     const nw=workouts.filter(w=>w.id!==id);
     setWorkouts(nw); persist(exStats,nw);
   }
+  function setRoutineForDay(day,ids){
+    const nr={...routineOverrides,[day]:ids};
+    setRoutineOverrides(nr); persist(exStats,workouts,customEx,nr);
+  }
+  function updatePR(id,value){
+    const ne={...exStats,[id]:{...(exStats[id]||{}),record:value}};
+    setExStats(ne); persist(ne,workouts,customEx,routineOverrides);
+  }
 
   // ejercicio "vivo" = catálogo + overrides guardados
   const liveEx=(id)=>({...CATALOG[id],...(exStats[id]||{})});
@@ -452,11 +470,12 @@ function App(){
   if(!ready) return <div style={{padding:40,textAlign:"center"}} className="muted">Cargando…</div>;
 
   // Rutas a pantalla completa (sin tabs)
-  if(view==="pick")    return <PickDay onPick={startDay} onBack={()=>setView("home")} liveEx={liveEx}/>;
+  if(view==="pick")    return <PickDay onPick={startDay} onBack={()=>setView("home")} liveEx={liveEx} onEdit={()=>setView("editor")} routineOverrides={routineOverrides}/>;
   if(view==="active")  return <Active session={session} setSession={setSession} liveEx={liveEx} onSaveExercise={saveCustomExercise} onAddToRoutine={addExerciseToRoutine} onFinish={finishSession} onCancel={()=>{setSession(null);setView("home");}}/>;
   if(view==="feel")    return <Feel onSave={saveSession} onBack={()=>setView("active")} defaultMin={Math.max(1,Math.round((Date.now()-session.start)/60000))} defaultDate={localDateOf(session.start)}/>;
   if(view==="summary") return <Summary s={lastSummary} onDone={()=>{setTab("home");setView("home");}}/>;
   if(view==="detail")  return <Detail w={detail} onBack={()=>setView("home")} onEditDate={updateWorkoutDate} onDelete={deleteWorkout}/>;
+  if(view==="editor")  return <Editor routineOverrides={routineOverrides} exStats={exStats} onSetRoutine={setRoutineForDay} onUpdatePR={updatePR} onBack={()=>setView("pick")}/>;
 
   return (<>
     {tab==="home" && <Home workouts={workouts} onStart={()=>setView("pick")}/>}
@@ -519,22 +538,95 @@ function Home({workouts,onStart}){
 }
 
 /* ---------------- Elegir día ---------------- */
-function PickDay({onPick,onBack,liveEx}){
+function PickDay({onPick,onBack,liveEx,onEdit,routineOverrides}){
   return (<div className="screen">
     <button className="back" onClick={onBack}>‹ Volver</button>
     <h1 className="display" style={{fontWeight:900,fontSize:26,margin:"4px 0 4px"}}>¿Qué entrenás?</h1>
     <p className="muted" style={{marginTop:0,fontSize:14}}>Un toque y te cargo los ejercicios con tus pesos.</p>
     {Object.keys(ROUTINES).map(k=>{
       const r=ROUTINES[k];
+      const n=((routineOverrides&&routineOverrides[k])||r.ex).length;
       return (<button key={k} className="day" onClick={()=>onPick(k)}>
         <div className="badge">{r.label}</div>
         <div style={{flex:1}}>
           <div className="t">Día {r.label}</div>
           <div className="s">{r.focus}</div>
         </div>
-        <div className="muted num" style={{fontWeight:800}}>{r.ex.length} ej.</div>
+        <div className="muted num" style={{fontWeight:800}}>{n} ej.</div>
       </button>);
     })}
+    <button className="cta ghost" style={{marginTop:16}} onClick={onEdit}>✎ Editar rutinas y récords</button>
+  </div>);
+}
+
+/* ---------------- Editor de rutina y récords ---------------- */
+function Editor({routineOverrides,exStats,onSetRoutine,onUpdatePR,onBack}){
+  const liveEx=(id)=>({...CATALOG[id],...(exStats[id]||{})});
+  const [mode,setMode]=useState("rutina");
+  const [day,setDay]=useState("A");
+  const [picker,setPicker]=useState(false);
+  const [editPR,setEditPR]=useState(null);
+
+  const ids=(routineOverrides[day]||ROUTINES[day].ex);
+  function move(i,dir){ const a=[...ids]; const j=i+dir; if(j<0||j>=a.length) return; const t=a[i];a[i]=a[j];a[j]=t; onSetRoutine(day,a); }
+  function removeEx(i){ onSetRoutine(day, ids.filter((_,k)=>k!==i)); }
+  function addEx(id){ if(!ids.includes(id)) onSetRoutine(day,[...ids,id]); setPicker(false); }
+
+  const byGroup={};
+  Object.values(CATALOG).filter(e=>!ids.includes(e.id)).forEach(e=>{(byGroup[e.group]=byGroup[e.group]||[]).push(e);});
+
+  const prIds=new Set();
+  Object.keys(ROUTINES).forEach(k=>((routineOverrides[k]||ROUTINES[k].ex).forEach(id=>prIds.add(id))));
+  Object.keys(exStats).forEach(id=>{ if((exStats[id]||{}).record>0) prIds.add(id); });
+  const prByGroup={};
+  [...prIds].filter(id=>CATALOG[id]).forEach(id=>{const e=liveEx(id);(prByGroup[e.group]=prByGroup[e.group]||[]).push({id,name:e.name,perSide:e.perSide,record:e.record});});
+
+  return (<div className="screen">
+    <button className="back" onClick={onBack}>‹ Volver</button>
+    <h1 className="display" style={{fontWeight:900,fontSize:25,margin:"4px 0 12px"}}>Editar</h1>
+    <div className="seg" style={{marginBottom:12}}>
+      <button className={mode==="rutina"?"sel":""} onClick={()=>setMode("rutina")}>Rutina</button>
+      <button className={mode==="records"?"sel":""} onClick={()=>setMode("records")}>Récords (PR)</button>
+    </div>
+
+    {mode==="rutina" ? (<div>
+      <div className="dayseg">
+        {Object.keys(ROUTINES).map(k=><button key={k} className={"dayb"+(day===k?" on":"")} onClick={()=>setDay(k)}>{k}</button>)}
+      </div>
+      <div className="muted" style={{fontSize:13,margin:"6px 2px 8px"}}>{ROUTINES[day].focus} · usá ↑↓ para ordenar</div>
+      {ids.map((id,i)=>{const e=liveEx(id);return (
+        <div className="editrow" key={id+"_"+i}>
+          <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:14.5}}>{e.name}</div><div className="muted" style={{fontSize:11.5,fontWeight:600}}>{e.group}</div></div>
+          <button className="ebtn" disabled={i===0} onClick={()=>move(i,-1)}>↑</button>
+          <button className="ebtn" disabled={i===ids.length-1} onClick={()=>move(i,1)}>↓</button>
+          <button className="ebtn x" onClick={()=>removeEx(i)}>✕</button>
+        </div>
+      );})}
+      <button className="cta ghost" style={{marginTop:12}} onClick={()=>setPicker(true)}>+ Agregar ejercicio</button>
+    </div>) : (<div>
+      <div className="muted" style={{fontSize:13,margin:"0 2px 8px"}}>Tocá un valor para corregir tu récord.</div>
+      {Object.keys(prByGroup).map(g=>(<div key={g}>
+        <div className="gh" style={{margin:"14px 0 4px"}}>{g}</div>
+        {prByGroup[g].map(x=>(
+          <div className="editrow" key={x.id}>
+            <div style={{flex:1,fontWeight:700,fontSize:14.5,minWidth:0}}>{x.name}</div>
+            {editPR===x.id
+              ? <input className="prinput" type="number" inputMode="decimal" ref={el=>el&&el.focus()} defaultValue={x.record} onBlur={ev=>{const n=parseFloat(String(ev.target.value).replace(",","."));if(!isNaN(n))onUpdatePR(x.id,Math.max(0,+n.toFixed(2)));setEditPR(null);}} onKeyDown={ev=>{if(ev.key==="Enter")ev.target.blur();}}/>
+              : <button className="prval" onClick={()=>setEditPR(x.id)}>{fmtWeight(x.record)}{x.perSide?"/lado":" kg"} ✎</button>}
+          </div>
+        ))}
+      </div>))}
+    </div>)}
+
+    {picker && (<div className="sheet-bg" onClick={()=>setPicker(false)}>
+      <div className="sheet" onClick={e=>e.stopPropagation()}>
+        <h2>Agregar al Día {day}</h2>
+        {Object.keys(byGroup).map(g=>(<div key={g}>
+          <div className="gh">{g}</div>
+          {byGroup[g].map(e=>(<button key={e.id} className="pick" onClick={()=>addEx(e.id)}><span className="pn">{e.name}</span><span className="pl">+</span></button>))}
+        </div>))}
+      </div>
+    </div>)}
   </div>);
 }
 
@@ -580,13 +672,14 @@ function Active({session,setSession,liveEx,onSaveExercise,onAddToRoutine,onFinis
     const exs=session.exs.map((e,i)=>i===exi?{...e,sets:e.sets.map(x=>({...x}))}:e);
     const s=exs[exi].sets[si]; s.done=!s.done;
     setSession({...session,exs});
-    if(s.done){
-      startRest(90); if(navigator.vibrate)navigator.vibrate(15);
-      if(exs[exi].sets.every(x=>x.done)){
-        const next=exs.findIndex((e,i)=>i>exi && !e.sets.every(x=>x.done));
-        if(next>=0) setTimeout(()=>setOpenIdx(next),350);
-      }
-    }
+    if(s.done){ startRest(90); if(navigator.vibrate)navigator.vibrate(15); }
+  }
+  const [editing,setEditing]=useState(null); // {exi,si,field}
+  const isEditing=(a,b,f)=>editing&&editing.exi===a&&editing.si===b&&editing.field===f;
+  function commitEdit(exi,si,field,raw){
+    const n=parseFloat(String(raw).replace(",","."));
+    if(!isNaN(n)) update(exi,e=>{e.sets[si][field]=Math.max(0,field==="reps"?Math.round(n):+n.toFixed(2));return e;});
+    setEditing(null);
   }
   function adj(exi,si,field,delta){update(exi,e=>{const s=e.sets[si];s[field]=Math.max(0,+(s[field]+delta).toFixed(1));e.sets[si]=s;return e;});}
   function setFeel(exi,si,f){update(exi,e=>{const s=e.sets[si];s.feel=s.feel===f?null:f;e.sets[si]=s;return e;});}
@@ -667,12 +760,16 @@ function Active({session,setSession,liveEx,onSaveExercise,onAddToRoutine,onFinis
               <div className="n num">{si+1}</div>
               <div className="stepper wt">
                 <button onClick={()=>adj(exi,si,"weight",-2.5)}>−</button>
-                <div className="val"><span className="big num">{fmtWeight(s.weight)}</span><span className="u">{e.perSide?"kg/lado":"kg"}</span></div>
+                {isEditing(exi,si,"weight")
+                  ? <input className="stepinput" type="number" inputMode="decimal" ref={el=>el&&el.focus()} defaultValue={s.weight} onBlur={ev=>commitEdit(exi,si,"weight",ev.target.value)} onKeyDown={ev=>{if(ev.key==="Enter")ev.target.blur();}}/>
+                  : <button className="val" onClick={()=>setEditing({exi,si,field:"weight"})}><span className="big num">{fmtWeight(s.weight)}</span><span className="u">{e.perSide?"kg/lado":"kg"}</span></button>}
                 <button onClick={()=>adj(exi,si,"weight",2.5)}>+</button>
               </div>
               <div className="stepper reps">
                 <button onClick={()=>adj(exi,si,"reps",-1)}>−</button>
-                <div className="val"><span className="big num">{s.reps}</span><span className="u">reps</span></div>
+                {isEditing(exi,si,"reps")
+                  ? <input className="stepinput" type="number" inputMode="numeric" ref={el=>el&&el.focus()} defaultValue={s.reps} onBlur={ev=>commitEdit(exi,si,"reps",ev.target.value)} onKeyDown={ev=>{if(ev.key==="Enter")ev.target.blur();}}/>
+                  : <button className="val" onClick={()=>setEditing({exi,si,field:"reps"})}><span className="big num">{s.reps}</span><span className="u">reps</span></button>}
                 <button onClick={()=>adj(exi,si,"reps",1)}>+</button>
               </div>
               <button className={"check"+(s.done?" done":"")} onClick={()=>toggle(exi,si)}>{s.done?"✓":""}</button>
@@ -1061,15 +1158,10 @@ function ExerciseProgress({workouts}){
 }
 
 /* ---------------- Pestaña Progreso (Cuerpo + Ejercicios) ---------------- */
-function Progreso({workouts,bodyLog,onAddBody,onDeleteBody}){
-  const [sub,setSub]=useState("cuerpo");
+function Progreso({workouts}){
   return (<div className="screen">
     <div className="topbar"><h1>Progreso</h1></div>
-    <div className="seg" style={{marginBottom:6}}>
-      <button className={sub==="cuerpo"?"sel":""} onClick={()=>setSub("cuerpo")}>Cuerpo</button>
-      <button className={sub==="ejercicios"?"sel":""} onClick={()=>setSub("ejercicios")}>Ejercicios</button>
-    </div>
-    {sub==="cuerpo" ? <BodyPanel bodyLog={bodyLog} onAdd={onAddBody} onDelete={onDeleteBody}/> : <ExerciseProgress workouts={workouts}/>}
+    <ExerciseProgress workouts={workouts}/>
   </div>);
 }
 
